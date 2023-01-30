@@ -1,0 +1,29 @@
+{
+  "name": "kuma-init",
+  "version": "0.1.0",
+  "description": "Init script for Uptime Kuma",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ligouras/kuma-init.git"
+  },
+  "author": " Spyros Ligouras <spyros@ligouras.com>",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/ligouras/kuma-init/issues"
+  },
+  "homepage": "https://github.com/ligouras/kuma-init#readme",
+  "dependencies": {
+    "commander": "^10.0.0",
+    "csv-parse": "^5.3.3",
+    "socket.io-client": "^4.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "^18.11.18",
+    "@types/ws": "^8.5.4",
+    "typescript": "^4.9.4"
+  }
+}
