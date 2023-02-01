@@ -6,10 +6,16 @@ program
     .requiredOption('-s, --server <url>', 'URL of the Uptime Kuma server')
     .option('-u, --username <username>', 'Username of the Uptime Kuma server')
     .option('-p, --password <password>', 'Password of the Uptime Kuma server')
+    .option('-v, --verbose', 'Output Socket.IO debug messages')
+    .option('-d, --dry-run', 'Do not send any data to the server')
     .version('0.1.0')
     .parse(process.argv);
 
 const options = program.opts();
+
+if (options.verbose) {
+    process.env.DEBUG = 'socket.io-client:*';
+}
 
 const monitor = {
     accepted_statuscodes: ["200-299"],
@@ -32,7 +38,6 @@ const monitor = {
     proxyId: null,
     resendInterval: 0,
     retryInterval: 60,
-    type: "http",
     upsideDown: false,
 }
 
@@ -49,8 +54,12 @@ socket.on('connect', async () => {
             process.stdin
                 .pipe(parse())
                 .on('data', (record: any) => {
-                    // add monitor
-                    socket.emit('add', { ...monitor, type: 'http', name: record[0], url: record[1]});
+                    if (options.dryRun !== true) {
+                        // add monitor
+                        socket.emit('add', { ...monitor, type: 'http', name: record[0], url: record[1]});
+                    } else {
+                        console.log('Dry run: would add monitor', { type: 'http', name: record[0], url: record[1]});
+                    }
                 })
                 .on('end', () => {
                     console.log('All monitors added');
