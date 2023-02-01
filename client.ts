@@ -25,7 +25,7 @@ const monitor = {
     docker_container: "",
     docker_host: null,
     expiryNotification: true,
-    ignoreTls: false,
+    ignoreTls: true,
     interval: 60,
     maxredirects: 10,
     maxretries: 0,
