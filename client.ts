@@ -1,6 +1,7 @@
 import { program } from 'commander';
 import { parse } from 'csv-parse';
 import { io } from 'socket.io-client';
+import * as readline from 'readline';
 
 program
     .requiredOption('-s, --server <url>', 'URL of the Uptime Kuma server')
@@ -18,7 +19,7 @@ if (options.verbose) {
 }
 
 const monitor = {
-    accepted_statuscodes: ["200-299"],
+    accepted_statuscodes: ["200-299","301","302"],
     authMethod: null,
     dns_resolve_server: "1.1.1.1",
     dns_resolve_type: "A",
@@ -27,8 +28,8 @@ const monitor = {
     expiryNotification: true,
     ignoreTls: true,
     interval: 60,
-    maxredirects: 10,
-    maxretries: 0,
+    maxredirects: 0,
+    maxretries: 5,
     method: "GET",
     mqttPassword: "",
     mqttSuccessMessage: "",
@@ -36,13 +37,67 @@ const monitor = {
     mqttUsername: "",
     notificationIDList: {},
     proxyId: null,
-    resendInterval: 0,
+    resendInterval: 360,
     retryInterval: 60,
     upsideDown: false,
 }
 
-const socket = io("https://" + options.server, {'transports': ['websocket']});
+async function addMonitorsSequentially() {
+    const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout,
+        terminal: false,
+    });
+
+    let count = 0;
+
+    const addMonitorPromise = (record: any) => {
+        return new Promise<void>((resolve) => {
+            if (options.dryRun !== true) {
+                // Add monitor
+                socket.emit('add', { ...monitor, type: 'http', name: record[0], url: record[1] }, () => {
+                    console.log('Added monitor', ++count, record[0]);
+                    resolve();
+                });
+            } else {
+                console.log('[Dry run] Added monitor', ++count, record[0]);
+                resolve();
+            }
+        });
+    };
+
+    for await (const line of rl) {
+        await addMonitorPromise(line.split(','));
+    }
+
+    console.log('All monitors added');
+    process.exit(0);
+}
+
+async function addMonitorsInParallel() {
+    let count = 0;
+
+    process.stdin
+        .pipe(parse())
+        .on('data', (record: any) => {
+            if (options.dryRun !== true) {
+                // add monitor
+                socket.emit('add', { ...monitor, type: 'http', name: record[0], url: record[1]});
+                console.log('Added monitor', ++count, record[0]);
+            } else {
+                console.log('[Dry run] Added monitor', ++count, record[0]);
+            }
+        })
+        .on('end', () => {
+            console.log('All monitors added');
+            process.exit(0);
+        });
+}
+
+const socket = io(options.server, {'transports': ['websocket']});
 const data: any[] = [];
+
+console.log('Connecting to server', options.server);
 
 socket.on('connect', async () => {
     console.log('Connected to Uptime Kuma');
@@ -51,20 +106,11 @@ socket.on('connect', async () => {
     socket.emit('login', {username: options.username, password: options.password, token: ''}, (res:any) => {
         if (res.ok) {
             console.log('Logged in successfully');
-            process.stdin
-                .pipe(parse())
-                .on('data', (record: any) => {
-                    if (options.dryRun !== true) {
-                        // add monitor
-                        socket.emit('add', { ...monitor, type: 'http', name: record[0], url: record[1]});
-                    } else {
-                        console.log('Dry run: would add monitor', { type: 'http', name: record[0], url: record[1]});
-                    }
-                })
-                .on('end', () => {
-                    console.log('All monitors added');
-                    process.exit(0);
-                });
+
+            addMonitorsSequentially().catch((error) => {
+                console.error('Error:', error);
+                process.exit(1);
+            });
         } else {
             console.log('Login failed: ' + res.msg);
         }
